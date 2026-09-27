@@ -73,7 +73,7 @@ pi --responses-server --responses-port 9000
 
 ```bash
 npx pi-responses-server --port 8321 --cwd ~/projects/my-app
-pi-responses-server --installed --port 8321   # Pi にインストール済みの場合
+pi-responses-server --port 8321   # pi install 済みなら自動でそちらを使用
 ```
 
 ### 呼び出し例

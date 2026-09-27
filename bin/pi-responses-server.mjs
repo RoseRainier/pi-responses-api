@@ -3,9 +3,11 @@
 //
 //   pi-responses-server [--port 8321] [--host 127.0.0.1] [--api-key KEY] [--cwd DIR]
 //                       [--model provider/id] [--tools read,bash] [--log-level info|debug]
-//                       [--installed] [-- <extra pi args>]
+//                       [--installed | --standalone] [-- <extra pi args>]
 import { spawn } from "node:child_process";
-import { dirname, resolve } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { homedir } from "node:os";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const packageRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -35,7 +37,8 @@ Options:
   --data-dir <dir>      Where responses and conversations are stored
   --cors <origins>      Comma separated CORS origins ("*" for any)
   --log-level <level>   silent | info | debug
-  --installed           The package is installed in Pi already; do not pass -e
+  --installed           Use the copy installed in Pi (default when "pi install" registered it)
+  --standalone          Load this checkout with -e even if another copy is installed
   -h, --help            Show this help
 
 Environment: PI_BIN selects the pi executable (default "pi").`);
@@ -44,7 +47,7 @@ Environment: PI_BIN selects the pi executable (default "pi").`);
 const args = process.argv.slice(2);
 const env = { ...process.env };
 const extraPiArgs = [];
-let installed = false;
+let installed;
 for (let i = 0; i < args.length; i++) {
 	const arg = args[i];
 	if (arg === "--") {
@@ -55,8 +58,8 @@ for (let i = 0; i < args.length; i++) {
 		usage();
 		process.exit(0);
 	}
-	if (arg === "--installed") {
-		installed = true;
+	if (arg === "--installed" || arg === "--standalone") {
+		installed = arg === "--installed";
 		continue;
 	}
 	const [name, inline] = arg.split(/=(.*)/s, 2);
@@ -74,6 +77,25 @@ for (let i = 0; i < args.length; i++) {
 	env[envName] = name === "--cwd" ? resolve(value) : value;
 }
 env.PI_RESPONSES_CWD ??= process.cwd();
+
+/** True when Pi's settings already load this package, in which case -e would register it twice. */
+function isInstalledInPi(cwd) {
+	const agentDir = process.env.PI_CODING_AGENT_DIR || join(homedir(), ".pi", "agent");
+	for (const file of [join(agentDir, "settings.json"), join(cwd, ".pi", "settings.json")]) {
+		if (!existsSync(file)) continue;
+		try {
+			const packages = JSON.parse(readFileSync(file, "utf8")).packages ?? [];
+			for (const entry of packages) {
+				const source = typeof entry === "string" ? entry : entry?.source;
+				if (typeof source === "string" && /pi-responses-api/.test(source)) return true;
+			}
+		} catch {
+			// Ignore unreadable settings; pi reports them itself.
+		}
+	}
+	return false;
+}
+installed ??= isInstalledInPi(env.PI_RESPONSES_CWD);
 
 const piBin = process.env.PI_BIN || "pi";
 const piArgs = ["--mode", "rpc", "--no-session", ...(installed ? [] : ["-e", packageRoot]), "--responses-server", ...extraPiArgs];

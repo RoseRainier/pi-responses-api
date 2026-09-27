@@ -1,4 +1,5 @@
-import { dirname, resolve, sep } from "node:path";
+import { existsSync, readFileSync } from "node:fs";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { ThinkingLevel } from "./types.ts";
 import type { Model } from "@earendil-works/pi-ai";
@@ -384,8 +385,32 @@ export class SessionPool {
 	}
 }
 
+const PACKAGE_NAME = "pi-responses-api";
+const ownPackageCache = new Map<string, boolean>();
+
+/** True for this package, including other installed copies of it (git/npm/local). */
 function isOwnExtension(path: string | undefined): boolean {
 	if (!path) return false;
 	const resolved = resolve(path);
-	return resolved === PACKAGE_ROOT || resolved.startsWith(PACKAGE_ROOT + sep);
+	if (resolved === PACKAGE_ROOT || resolved.startsWith(PACKAGE_ROOT + sep)) return true;
+	let dir = dirname(resolved);
+	for (let depth = 0; depth < 4; depth++) {
+		const cached = ownPackageCache.get(dir);
+		if (cached !== undefined) return cached;
+		const manifest = join(dir, "package.json");
+		if (existsSync(manifest)) {
+			let own = false;
+			try {
+				own = JSON.parse(readFileSync(manifest, "utf8")).name === PACKAGE_NAME;
+			} catch {
+				own = false;
+			}
+			ownPackageCache.set(dir, own);
+			return own;
+		}
+		const parent = dirname(dir);
+		if (parent === dir) break;
+		dir = parent;
+	}
+	return false;
 }

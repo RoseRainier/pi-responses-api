@@ -94,7 +94,7 @@ pi --responses-server --responses-port 9000
 ```bash
 npx pi-responses-server --port 8321 --cwd ~/projects/my-app
 # or, if the package is already installed in Pi:
-pi-responses-server --installed --port 8321
+pi-responses-server --port 8321   # detects a "pi install"ed copy automatically
 ```
 
 This runs Pi in RPC mode with the server enabled. Stop it with Ctrl+C / SIGTERM.
