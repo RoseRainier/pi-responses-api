@@ -1,0 +1,19 @@
+{
+  "host": "127.0.0.1",
+  "port": 8321,
+  "apiKeys": [],
+  "corsOrigins": [],
+  "tools": ["read", "grep", "find", "ls"],
+  "toolCallItems": "mcp_call",
+  "defaultModel": "openai-codex/gpt-5.5",
+  "modelAliases": {
+    "gpt-4o": "openai-codex/gpt-5.5",
+    "local": "llama-swap/gemma-4-26B-A4B-Un"
+  },
+  "unknownModel": "default",
+  "persistSessions": true,
+  "loadExtensions": true,
+  "clientToolTimeoutMs": 600000,
+  "maxConcurrentRuns": 4,
+  "logLevel": "info"
+}
