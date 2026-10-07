@@ -269,15 +269,23 @@ export interface OpenSessionOptions {
 	sessionName?: string;
 }
 
+interface SessionPoolDependencies {
+	config: ServerConfig;
+	/** Return a fresh runtime: extension provider registrations belong to one session. */
+	createModelRuntime: () => Promise<ModelRuntime>;
+	agentDir: string;
+	log: Log;
+}
+
 /** Keeps live sessions keyed by session file (or in-memory id) and disposes idle ones. */
 export class SessionPool {
 	private readonly handles = new Map<string, SessionHandle>();
 	private readonly opening = new Map<string, Promise<SessionHandle>>();
 	private sweepTimer: NodeJS.Timeout | undefined;
+	private readonly deps: SessionPoolDependencies;
 
-	constructor(
-		private readonly deps: { config: ServerConfig; modelRuntime: ModelRuntime; agentDir: string; log: Log },
-	) {
+	constructor(deps: SessionPoolDependencies) {
+		this.deps = deps;
 		this.sweepTimer = setInterval(() => void this.sweep(), 30_000);
 		this.sweepTimer.unref?.();
 	}
@@ -302,7 +310,10 @@ export class SessionPool {
 	}
 
 	async create(options: OpenSessionOptions): Promise<SessionHandle> {
-		const { config, modelRuntime, agentDir, log } = this.deps;
+		const { config, createModelRuntime, agentDir, log } = this.deps;
+		// Extensions may replace/wrap providers during session_start and restore them
+		// on shutdown. Sharing a runtime would stack wrappers across conversations.
+		const modelRuntime = await createModelRuntime();
 		const sessionManager = options.file
 			? SessionManager.open(options.file, config.sessionDir, options.cwd)
 			: options.persist

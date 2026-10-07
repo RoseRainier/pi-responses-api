@@ -1,4 +1,5 @@
 import { mkdirSync } from "node:fs";
+import { join } from "node:path";
 import { ModelRuntime } from "@earendil-works/pi-coding-agent";
 import { defaultAgentDir, loadConfig, type ServerConfig } from "./config.ts";
 import { ResponsesEngine } from "./engine.ts";
@@ -40,12 +41,21 @@ export async function startServer(options: {
 	const log = createLogger(config, options.sink);
 	mkdirSync(config.dataDir, { recursive: true });
 
-	const modelRuntime = await ModelRuntime.create({ refreshOnCreate: config.refreshModels, modelRefreshTimeoutMs: 10_000 });
-	// Resolves credential availability so that the default model and `/models` are known.
-	await modelRuntime.getAvailable().catch(() => []);
+	const createModelRuntime = async (refreshOnCreate = false): Promise<ModelRuntime> => {
+		const runtime = await ModelRuntime.create({
+			authPath: join(agentDir, "auth.json"),
+			modelsPath: join(agentDir, "models.json"),
+			refreshOnCreate,
+			modelRefreshTimeoutMs: 10_000,
+		});
+		await runtime.getAvailable().catch(() => []);
+		return runtime;
+	};
+	// Keep the API model catalog separate from session-local extension providers.
+	const modelRuntime = await createModelRuntime(config.refreshModels);
 
 	const store = new Store(config.dataDir);
-	const pool = new SessionPool({ config, modelRuntime, agentDir, log });
+	const pool = new SessionPool({ config, createModelRuntime, agentDir, log });
 	const engine = new ResponsesEngine({ config, store, pool, modelRuntime, defaultCwd: config.cwd ?? options.defaultCwd, log });
 	const http = new ResponsesHttpServer(config, engine, log);
 	await http.listen();

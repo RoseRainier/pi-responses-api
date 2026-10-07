@@ -1,6 +1,6 @@
 {
   "name": "pi-responses-api",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Pi extension that exposes the Pi coding agent through an OpenAI Responses API compatible HTTP server",
   "type": "module",
   "license": "Apache-2.0",
